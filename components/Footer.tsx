@@ -1,38 +1,27 @@
 import Link from "next/link";
-import { BirdMark } from "./Bird";
-
+import { LogoMark } from "./Birds";
+import { Topo } from "./Topo";
 export default function Footer() {
   return (
-    <footer className="bg-forest-950 text-sage-100">
-      <div className="mx-auto grid max-w-6xl gap-8 px-5 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
+    <footer className="relative overflow-hidden bg-forest-950 text-cream/80">
+      <Topo className="text-white/[.05]" seed={2} />
+      <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-14 lg:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
         <div>
-          <div className="flex items-center gap-2.5 text-white">
-            <BirdMark className="h-8 w-8" />
-            <span className="font-serif text-2xl font-semibold">SIUL</span>
-          </div>
-          <p className="mt-3 max-w-sm text-sm leading-relaxed text-sage-200">
-            Mengenali burung dari suaranya, dan jujur ketika suara itu belum dikenal.
-          </p>
+          <div className="flex items-center gap-3"><LogoMark className="h-10 w-10" /><b className="text-2xl font-extrabold tracking-tight text-white">SIUL</b></div>
+          <p className="mt-4 max-w-sm text-sm leading-relaxed">Prototipe pengenalan suara burung berbasis pendekatan open-set, dikembangkan dari karya Tim IRIS Darsana untuk NPC DSC 2026.</p>
         </div>
-        <nav aria-label="Halaman" className="text-sm">
-          <p className="mb-3 font-semibold text-white">Halaman</p>
-          <ul className="space-y-2 text-sage-200">
-            <li><Link href="/analyze" className="hover:text-white">Analisis audio</Link></li>
-            <li><Link href="/clusters" className="hover:text-white">Katalog Cluster</Link></li>
-            <li><Link href="/rules" className="hover:text-white">Aturan Penolakan</Link></li>
-          </ul>
-        </nav>
-        <div className="text-sm">
-          <p className="mb-3 font-semibold text-white">Model yang dipakai</p>
-          <ul className="space-y-2 text-sage-200">
-            <li>Perch v2 (Apache 2.0)</li>
-            <li>BirdNET v2.4 (CC BY-NC-SA 4.0, nonkomersial)</li>
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-widest text-white">Jelajahi</h3>
+          <ul className="mt-4 space-y-2 text-sm">
+            {[["/analyze", "Analisis Audio"], ["/clusters", "Katalog Cluster"], ["/rules", "Simulator Aturan"]].map(([h, t]) => <li key={h}><Link href={h} className="hover:text-leaf">{t}</Link></li>)}
           </ul>
         </div>
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-widest text-white">Pengembang</h3>
+          <p className="mt-4 text-sm leading-relaxed">Tim IRIS Darsana<br />Teknologi Sains Data<br />Universitas Airlangga, Surabaya</p>
+        </div>
       </div>
-      <div className="border-t border-white/10 py-4 text-center text-xs text-sage-200">
-        © 2026 Tim IRIS Darsana, Teknologi Sains Data, Universitas Airlangga
-      </div>
+      <div className="relative border-t border-white/10 py-4 text-center text-xs text-cream/50">© 2026 Tim IRIS Darsana</div>
     </footer>
   );
 }

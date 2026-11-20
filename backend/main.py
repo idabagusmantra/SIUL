@@ -1,20 +1,49 @@
-"""Kontrak backend SIUL. Next.js memanggil POST /analyze (multipart: field `mode` = "single" | "batch", field `files`).
-Respons: {"clusters": [{cluster, n, files, evidence{fK,fC,fB,mB,mC,mK,cB,pB,pK,medNonTarget,e}, label, rule, reason}]}
+"""Kontrak backend SIUL (FastAPI). Frontend Next.js memanggil lewat SIUL_API_URL.
 
-TODO (port dari DatSci_IRIS_Darsana_Notebook.ipynb):
-  1. Ekstraksi: Perch v2 + BirdNET v2.4 + 750 fitur hf (notebook ekstraksi terpisah, bukan notebook final)
-  2. Bagian 4.3: fitur zero-shot (Kaur, Ksib, Blon, Cpar)
-  3. Bagian 4.4: StandardScaler -> PCA 96 -> WCCN -> L2 (fit pada data latih)
-  4. Bagian 5.2: SNN + Leiden, voting 18 setelan
-  5. Bagian 5.3: bukti per cluster + aturan (sama dengan lib/rules.ts)
-Mode "batch": jalankan langkah 1-5 (clustering). Mode "single": lewati clustering; satu klip = satu unit,
-  fK/fC/fB bernilai 0/1 (detektor zero-shot aktif atau tidak), kembalikan satu elemen `clusters` dengan n = 1.
+    uvicorn main:app --host 0.0.0.0 --port 8000
+
+Endpoint:
+  GET  /v1/health
+  POST /v1/analyze/single   multipart, field `files` (tepat 1 berkas)  -> {"result": ClipResult}
+  POST /v1/analyze/batch    multipart, field `files` (>= 2 berkas)     -> {"clips": [...], "clusters": [...]}
+
+Bentuk respons ada di lib/types.ts. Aturan di lib/rules.ts HARUS sama dengan notebook final (Bagian 5.3).
+Port dari DatSci_IRIS_Darsana_Notebook.ipynb: ekstraksi Perch/BirdNET + fitur hf, fitur zero-shot (4.3),
+StandardScaler -> PCA 96 -> WCCN -> L2 (4.4), LogReg ensemble (5.1), SNN + Leiden voting 18 setelan (5.2), aturan (5.3).
+Artefak latih (scaler, PCA, WCCN, centroid group, LogReg) disimpan sekali dengan joblib lalu dimuat saat startup.
 """
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import os
+from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
 
 app = FastAPI(title="SIUL backend")
+API_KEY = os.getenv("SIUL_API_KEY")
 
 
-@app.post("/analyze")
-async def analyze(files: list[UploadFile] = File(...)):
-    raise HTTPException(501, "Belum diimplementasikan: port pipeline dari notebook (lihat docstring).")
+def auth(authorization: str | None = Header(default=None)):
+    if API_KEY and authorization != f"Bearer {API_KEY}":
+        raise HTTPException(401, "Tidak berwenang")
+
+
+@app.get("/v1/health")
+def health():
+    return {"ok": True}
+
+
+@app.post("/v1/analyze/single", dependencies=[Depends(auth)])
+async def analyze_single(files: list[UploadFile] = File(...)):
+    if len(files) != 1:
+        raise HTTPException(400, "Tepat 1 berkas")
+    # TODO: embed -> fitur zero-shot (kaur, ksib, blon, cpar) -> probabilitas LogReg (pB, pC, pK)
+    #       -> kemiripan ke centroid group latih (mB, mC, mK, cB) -> veto (medNonTarget, e) -> decide_clip
+    # return {"result": {"file": ..., "label": ..., "rule": ..., "reason": ..., "evidence": {...}}}
+    raise HTTPException(501, "Belum diimplementasikan")
+
+
+@app.post("/v1/analyze/batch", dependencies=[Depends(auth)])
+async def analyze_batch(files: list[UploadFile] = File(...)):
+    if len(files) < 2:
+        raise HTTPException(400, "Minimal 2 berkas")
+    # TODO: embed semua klip -> ruang WCCN -> SNN + Leiden (18 setelan, voting) -> bukti per cluster -> decide
+    # clips: [{file, cluster, label, x, y}] (x,y = proyeksi 2D, mis. t-SNE/UMAP, dinormalisasi ke [-1, 1])
+    # clusters: [{id, n, files, evidence{fK,fC,fB,mB,mC,mK,cB,pB,pK,medNonTarget,e}, label, rule, reason, agreement}]
+    raise HTTPException(501, "Belum diimplementasikan")

@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import AnalyzeClient from "./AnalyzeClient";
+import { PageHero } from "@/components/ui";
+import AnalyzeClient from "@/components/analyze/AnalyzeClient";
 
 export const metadata: Metadata = { title: "Analisis Audio" };
 
 export default function AnalyzePage() {
   return (
-    <div className="mx-auto max-w-6xl px-5 py-12">
-      <h1 className="text-4xl font-semibold">Analisis rekaman</h1>
-      <p className="mt-3 max-w-2xl leading-relaxed text-mute">Pilih mode sesuai jumlah berkas. Format yang didukung: FLAC, WAV, MP3, OGG, M4A, maksimal 40 MB per berkas.</p>
+    <>
+      <PageHero eyebrow="Analisis audio" title="Unggah rekaman, dapatkan label beserta buktinya.">
+        Pilih mode sesuai rekaman Anda. Satu klip dapat diuji seketika; beberapa klip dari satu lokasi sebaiknya dianalisis sebagai batch agar keputusan lebih andal.
+      </PageHero>
       <AnalyzeClient />
-    </div>
+    </>
   );
 }

@@ -1,30 +1,38 @@
-# SIUL — Pengenal Avifauna Bioakustik
+# SIUL — Bioacoustic Avifauna Classifier
 
-Antarmuka web untuk klasifikasi suara burung open-set (Bondol Jawa, Cendrawasih, Kutilang, Unknown),
-berbasis pipeline Tim IRIS Darsana. Next.js 16 · React 19 · Tailwind CSS v4.
+Antarmuka web (Next.js 16, React 19, Tailwind CSS v4) untuk mengenali suara Bondol Jawa, Cendrawasih, dan Kutilang
+dengan pendekatan open-set (label Unknown bila bukti tidak cukup).
 
-## Jalankan
     npm install
-    cp .env.example .env.local
-    npm run dev   # http://localhost:3000
+    npm run dev        # http://localhost:3000
 
 ## Halaman
-- `/` Beranda dan alur pipeline
-- `/analyze` Analisis audio, dua mode: **Klip tunggal** dan **Batch per sumber**
-- `/clusters` Katalog 22 cluster uji (`lib/data.ts`)
-- `/rules` Simulator aturan open-set 1–6 (`lib/rules.ts`)
+| Rute | Isi |
+|---|---|
+| `/` | Ikhtisar sistem dan pipeline |
+| `/analyze` | Unggah audio: tab **Klip Tunggal** (evaluasi per klip) dan **Batch Sumber** (SNN + Leiden) |
+| `/clusters` | Katalog cluster referensi beserta bukti |
+| `/rules` | Simulator aturan penolakan open-set |
 
-## Kontrak backend
-`POST /api/analyze` memvalidasi unggahan lalu meneruskan `multipart/form-data` ke `${SIUL_BACKEND_URL}/analyze`:
+## Menyambungkan backend
+Browser tidak memanggil backend langsung. Alurnya: **browser → route handler Next.js → backend FastAPI**.
 
-| Field   | Nilai                                          |
-|---------|------------------------------------------------|
-| `mode`  | `single` (tepat 1 berkas) atau `batch` (≥ 6)   |
-| `files` | berkas audio (FLAC/WAV/MP3/OGG/M4A, ≤ 40 MB)   |
+1. Salin `.env.example` menjadi `.env.local`, isi `SIUL_API_URL` (mis. `http://localhost:8000`), opsional `SIUL_API_KEY`.
+2. Jalankan backend: `cd backend && pip install -r requirements.txt && uvicorn main:app --port 8000`.
+3. Mulai ulang `npm run dev`. Banner di `/analyze` berubah dari "Mode demonstrasi" menjadi "Backend terhubung".
 
-Respons yang diharapkan: `{"clusters": [{cluster, n, files, evidence, label, rule, reason}]}` (lihat `lib/types.ts`).
-- `single`: satu elemen `clusters` dengan `n = 1`; `evidence.fK/fC/fB` bernilai 0 atau 1 (detektor aktif atau tidak).
-- `batch`: WCCN → graf SNN → Leiden (voting 18 setelan) → bukti agregat per cluster.
+Kontrak:
+- `GET /v1/health` → `{"ok": true}`
+- `POST /v1/analyze/single` (multipart, field `files`, 1 berkas) → `{"result": ClipResult}`
+- `POST /v1/analyze/batch` (multipart, field `files`, ≥ 2 berkas) → `{"clips": BatchClip[], "clusters": BatchCluster[]}`
 
-Tanpa `SIUL_BACKEND_URL`, API mengembalikan simulasi deterministik (`mode: "demo"`) dan UI menampilkan peringatan.
-Backend (`backend/main.py`) masih berupa kerangka yang membalas 501.
+Tipe lengkap ada di `lib/types.ts`; proxy di `lib/backend.ts` dan `app/api/analyze/*`. `backend/main.py` baru kerangka:
+model Perch/BirdNET dan pipeline notebook belum di-port. Tanpa `SIUL_API_URL`, aplikasi memakai `lib/demo.ts`
+(hasil dibangkitkan dari nama berkas, bukan prediksi model, dan diberi banner).
+
+Untuk deploy di Vercel, backend harus dihosting terpisah (butuh Python dan model); isi `SIUL_API_URL` di Environment Variables.
+Batas ukuran body fungsi serverless Vercel kecil, jadi untuk unggahan audio besar pertimbangkan hosting Next.js di server sendiri
+atau unggah langsung ke backend.
+
+## Catatan lisensi
+Bobot BirdNET berlisensi CC BY-NC-SA 4.0 (nonkomersial); Perch v2 berlisensi Apache 2.0.

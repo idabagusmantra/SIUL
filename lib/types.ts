@@ -1,11 +1,13 @@
-import type { Evidence, Label } from "./rules";
+import type { ClipEvidence, Decision, Evidence, Label } from "./rules";
 
-export type AnalyzeMode = "single" | "batch";
+export type Mode = "demo" | "live";
+export interface ClipResult extends Decision { file: string; evidence: ClipEvidence }
+export interface SingleResponse { mode: Mode; result: ClipResult }
 
-/** Satu unit keputusan: satu cluster sumber (batch) atau satu klip (single, n = 1). */
-export interface ClusterResult {
-  cluster: string; n: number; files: string[]; evidence: Evidence; label: Label; rule: number; reason: string;
+export interface BatchClip { file: string; cluster: string; label: Label; x: number; y: number }
+export interface BatchCluster extends Decision {
+  id: string; n: number; files: string[]; evidence: Evidence;
+  agreement?: number; // 0-1, kesepakatan voting antarsetelan clustering
 }
-
-/** Respons /api/analyze. `mode` = asal hasil; `kind` = mode inferensi yang diminta. */
-export interface AnalyzeResponse { mode: "demo" | "live"; kind: AnalyzeMode; clusters: ClusterResult[] }
+export interface BatchResponse { mode: Mode; clips: BatchClip[]; clusters: BatchCluster[] }
+export interface StatusResponse { mode: Mode; backendOk: boolean | null }

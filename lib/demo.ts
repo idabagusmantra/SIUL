@@ -1,45 +1,54 @@
-// Mode DEMO: bukan inferensi nyata. Bukti dibangkitkan deterministik dari nama berkas
-// agar alur UI bisa dicoba tanpa backend. Ganti dengan backend FastAPI (lihat backend/).
-import { decide, Evidence } from "./rules";
-import type { AnalyzeMode, AnalyzeResponse, ClusterResult } from "./types";
+// MODE DEMONSTRASI: bukan prediksi model. Nilai bukti dibangkitkan deterministik dari nama berkas
+// supaya seluruh alur antarmuka dapat dicoba tanpa backend.
+import { decide, decideClip, type ClipEvidence, type Evidence } from "./rules";
+import type { BatchClip, BatchCluster, BatchResponse, SingleResponse } from "./types";
 
-function hash(s: string) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-function rng(seed: number) { let a = seed; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function hash(s: string) { let x = 2166136261; for (const c of s) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619); } return x >>> 0; }
+const rnd = (seed: number, i: number) => ((Math.imul(seed ^ Math.imul(i + 1, 2654435761), 1597334677) >>> 0) % 10000) / 10000;
+const between = (seed: number, i: number, a: number, b: number) => a + rnd(seed, i) * (b - a);
 
-const base: Evidence = { fK: 0, fC: 0, fB: 0, mB: 0.2, mC: 0.15, mK: 0.15, cB: 0.3, pB: 0.2, pK: 0.15, medNonTarget: 3, e: 0 };
-const ARCH: Evidence[] = [
-  { ...base, fK: 0.9, mK: 0.6, pK: 0.9 },
-  { ...base, fB: 0.9, mB: 0.4, cB: 0.5, pB: 0.85 },
-  { ...base, mB: 0.6, cB: 0.89, pB: 0.8 },
-  { ...base, fC: 0.93, mC: 0.4 },
-  { ...base },
-  { ...base, mB: 0.3, medNonTarget: 8.5, e: 4 },
-];
-const jit = (v: number, r: () => number, s = 0.06) => Math.max(-0.2, Math.min(1, v + (r() - 0.5) * s * 2));
-
-function evidenceFor(seed: number, single: boolean): Evidence {
-  const r = rng(seed);
-  const a = ARCH[Math.floor(r() * ARCH.length)];
-  const f = (v: number) => (single ? (r() < v ? 1 : 0) : jit(Math.max(v, 0.02), r));
-  return {
-    fK: f(a.fK), fC: f(a.fC), fB: f(a.fB),
-    mB: jit(a.mB, r), mC: jit(a.mC, r), mK: jit(a.mK, r), cB: jit(a.cB, r), pB: jit(a.pB, r), pK: jit(a.pK, r),
-    medNonTarget: a.medNonTarget + (r() - 0.5), e: Math.max(0, a.e + (r() - 0.5)),
-  };
+function clipEvidence(name: string): ClipEvidence {
+  const s = hash(name), r = (i: number, a: number, b: number) => between(s, i, a, b);
+  const base: ClipEvidence = { kaur: r(1, -2, 2), ksib: r(2, -3, -1), blon: r(3, 0, 3), cpar: r(4, 0, 2.5), pB: r(5, 0.1, 0.4), pC: r(6, 0.05, 0.25), pK: r(7, 0.05, 0.25), mB: r(8, 0.1, 0.35), mC: r(9, 0, 0.2), mK: r(10, 0, 0.3), cB: r(11, 0.1, 0.45), medNonTarget: r(12, 2, 5), e: r(13, -1, 1.5) };
+  switch (s % 6) {
+    case 0: return { ...base, kaur: r(20, 6, 9), ksib: r(21, 0.5, 2.5), pK: r(22, 0.8, 0.97), mK: r(23, 0.55, 0.75) };
+    case 1: return { ...base, blon: r(20, 6.5, 9), pB: r(21, 0.75, 0.95), mB: r(22, 0.5, 0.7), cB: r(23, 0.7, 0.9) };
+    case 2: return { ...base, pB: r(20, 0.75, 0.95), mB: r(21, 0.55, 0.7), cB: r(22, 0.78, 0.92), mK: r(23, 0.1, 0.3) };
+    case 3: return { ...base, cpar: r(20, 4.5, 7), pC: r(21, 0.4, 0.7) };
+    case 4: return { ...base, medNonTarget: r(20, 8, 11), e: r(21, 3.5, 6), mB: r(22, 0.3, 0.5) };
+    default: return base;
+  }
 }
 
-export function demoAnalyze(files: { name: string; size: number }[], kind: AnalyzeMode): AnalyzeResponse {
-  const groups: string[][] = [];
-  if (kind === "single") groups.push([files[0].name]);
-  else {
-    const k = Math.min(6, Math.max(2, Math.round(files.length / 5)));
-    const g: string[][] = Array.from({ length: k }, () => []);
-    files.forEach((f) => g[hash(f.name) % k].push(f.name));
-    groups.push(...g.filter((x) => x.length));
+export function demoSingle(name: string): SingleResponse {
+  const evidence = clipEvidence(name);
+  return { mode: "demo", result: { file: name, evidence, ...decideClip(evidence) } };
+}
+
+const ARCH: Evidence[] = [
+  { fK: 0.82, fC: 0.05, fB: 0.02, mB: 0.2, mC: 0.1, mK: 0.7, cB: 0.2, pB: 0.1, pK: 0.9, medNonTarget: 3, e: 0 },
+  { fK: 0.02, fC: 0.03, fB: 0.88, mB: 0.62, mC: 0.1, mK: 0.2, cB: 0.8, pB: 0.88, pK: 0.05, medNonTarget: 3, e: 0 },
+  { fK: 0.01, fC: 0.02, fB: 0.06, mB: 0.62, mC: 0.1, mK: 0.25, cB: 0.86, pB: 0.84, pK: 0.08, medNonTarget: 4, e: 0.5 },
+  { fK: 0.02, fC: 0.76, fB: 0.02, mB: 0.2, mC: 0.3, mK: 0.1, cB: 0.3, pB: 0.2, pK: 0.05, medNonTarget: 3, e: 0 },
+  { fK: 0.03, fC: 0.12, fB: 0.04, mB: 0.2, mC: 0.1, mK: 0.15, cB: 0.3, pB: 0.3, pK: 0.15, medNonTarget: 7.8, e: 3.4 },
+];
+
+export function demoBatch(names: string[]): BatchResponse {
+  const k = Math.min(5, Math.max(2, Math.ceil(names.length / 4)));
+  const groups = new Map<number, string[]>();
+  for (const n of names) { const g = hash(n) % k; groups.set(g, [...(groups.get(g) ?? []), n]); }
+  const clips: BatchClip[] = [], clusters: BatchCluster[] = [];
+  let idx = 0;
+  for (const [g, files] of [...groups].sort((a, b) => a[0] - b[0])) {
+    const id = `S${String(idx + 1).padStart(2, "0")}`;
+    const seed = hash(id + files.length);
+    const a = ARCH[(g + hash(names[0])) % ARCH.length];
+    const evidence = Object.fromEntries(Object.entries(a).map(([key, v], i) => [key, Math.max(0, v + between(seed, i, -0.04, 0.04))])) as unknown as Evidence;
+    const dec = decide(evidence);
+    const ang = (idx / groups.size) * Math.PI * 2 + 0.6;
+    files.forEach((file, j) => clips.push({ file, cluster: id, label: dec.label, x: Math.cos(ang) * 0.58 + between(hash(file), j, -0.2, 0.2), y: Math.sin(ang) * 0.58 + between(hash(file), j + 9, -0.2, 0.2) }));
+    clusters.push({ id, n: files.length, files, evidence, agreement: between(seed, 30, 0.9, 1), ...dec });
+    idx++;
   }
-  const clusters: ClusterResult[] = groups.map((fs, i) => {
-    const ev = evidenceFor(hash(fs.join("|") + (kind === "single" ? files[0].size : "")), kind === "single");
-    return { cluster: kind === "single" ? "klip" : `c${String(i).padStart(2, "0")}`, n: fs.length, files: fs, evidence: ev, ...decide(ev) };
-  });
-  return { mode: "demo", kind, clusters };
+  return { mode: "demo", clips, clusters };
 }

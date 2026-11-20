@@ -1,4 +1,4 @@
-"""Kontrak backend SIUL. Next.js memanggil POST /analyze (multipart, field `files`).
+"""Kontrak backend SIUL. Next.js memanggil POST /analyze (multipart: field `mode` = "single" | "batch", field `files`).
 Respons: {"clusters": [{cluster, n, files, evidence{fK,fC,fB,mB,mC,mK,cB,pB,pK,medNonTarget,e}, label, rule, reason}]}
 
 TODO (port dari DatSci_IRIS_Darsana_Notebook.ipynb):
@@ -7,7 +7,8 @@ TODO (port dari DatSci_IRIS_Darsana_Notebook.ipynb):
   3. Bagian 4.4: StandardScaler -> PCA 96 -> WCCN -> L2 (fit pada data latih)
   4. Bagian 5.2: SNN + Leiden, voting 18 setelan
   5. Bagian 5.3: bukti per cluster + aturan (sama dengan lib/rules.ts)
-Catatan: clustering butuh banyak klip uji; satu klip tunggal tidak bermakna.
+Mode "batch": jalankan langkah 1-5 (clustering). Mode "single": lewati clustering; satu klip = satu unit,
+  fK/fC/fB bernilai 0/1 (detektor zero-shot aktif atau tidak), kembalikan satu elemen `clusters` dengan n = 1.
 """
 from fastapi import FastAPI, File, HTTPException, UploadFile
 

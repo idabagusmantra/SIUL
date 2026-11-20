@@ -1,18 +1,30 @@
-# SIUL
-Prototype Next.js + React untuk hasil NPC DSC 2026 (Tim IRIS Darsana): klasifikasi suara burung open-set
-(Bondol Jawa, Cendrawasih, Kutilang, Unknown) dengan keputusan tingkat cluster.
+# SIUL — Pengenal Avifauna Bioakustik
+
+Antarmuka web untuk klasifikasi suara burung open-set (Bondol Jawa, Cendrawasih, Kutilang, Unknown),
+berbasis pipeline Tim IRIS Darsana. Next.js 16 · React 19 · Tailwind CSS v4.
 
 ## Jalankan
     npm install
+    cp .env.example .env.local
     npm run dev   # http://localhost:3000
 
 ## Halaman
-- `/` ringkasan & pipeline · `/analyze` unggah audio (mode DEMO tanpa backend)
-- `/clusters` 22 cluster uji (Tabel XXII) · `/rules` simulator 6 aturan open-set · `/validation` grafik validasi
+- `/` Beranda dan alur pipeline
+- `/analyze` Analisis audio, dua mode: **Klip tunggal** dan **Batch per sumber**
+- `/clusters` Katalog 22 cluster uji (`lib/data.ts`)
+- `/rules` Simulator aturan open-set 1–6 (`lib/rules.ts`)
 
-## Struktur
-- `lib/rules.ts` aturan keputusan (Laporan IV-D) · `lib/data.ts` angka dari laporan · `lib/demo.ts` mode demo
-- `app/api/analyze` proxy ke `SIUL_BACKEND_URL` bila diisi · `backend/` kontrak FastAPI (belum diimplementasikan)
+## Kontrak backend
+`POST /api/analyze` memvalidasi unggahan lalu meneruskan `multipart/form-data` ke `${SIUL_BACKEND_URL}/analyze`:
 
-## Catatan
-Inferensi nyata butuh Perch/BirdNET + data latih (Python); aplikasi web ini belum memuat model.
+| Field   | Nilai                                          |
+|---------|------------------------------------------------|
+| `mode`  | `single` (tepat 1 berkas) atau `batch` (≥ 6)   |
+| `files` | berkas audio (FLAC/WAV/MP3/OGG/M4A, ≤ 40 MB)   |
+
+Respons yang diharapkan: `{"clusters": [{cluster, n, files, evidence, label, rule, reason}]}` (lihat `lib/types.ts`).
+- `single`: satu elemen `clusters` dengan `n = 1`; `evidence.fK/fC/fB` bernilai 0 atau 1 (detektor aktif atau tidak).
+- `batch`: WCCN → graf SNN → Leiden (voting 18 setelan) → bukti agregat per cluster.
+
+Tanpa `SIUL_BACKEND_URL`, API mengembalikan simulasi deterministik (`mode: "demo"`) dan UI menampilkan peringatan.
+Backend (`backend/main.py`) masih berupa kerangka yang membalas 501.

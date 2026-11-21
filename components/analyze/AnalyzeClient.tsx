@@ -44,20 +44,23 @@ export default function AnalyzeClient() {
     setBusy(true); setErr(""); setSingle(null); setBatch(null);
     try {
       const fd = new FormData(); files.forEach(f => fd.append("files", f));
-      const res = await fetch(`/api/analyze/${mode}`, { method: "POST", body: fd });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? "Analisis gagal.");
-      if (mode === "single") setSingle(j); else setBatch(j);
+      // Unggah langsung ke backend bila NEXT_PUBLIC_SIUL_DIRECT_URL diisi (perlu di Vercel: fungsi serverless menolak body > 4,5 MB).
+      const direct = process.env.NEXT_PUBLIC_SIUL_DIRECT_URL?.replace(/\/$/, "");
+      const res = await fetch(direct ? `${direct}/v1/analyze/${mode}` : `/api/analyze/${mode}`, { method: "POST", body: fd });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? (typeof j.detail === "string" ? j.detail : "Analisis gagal."));
+      const out = direct ? { mode: "live", ...j } : j;
+      if (mode === "single") setSingle(out); else setBatch(out);
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   }
-  const demo = (single ?? batch)?.mode === "demo" || (!single && !batch && status?.mode === "demo");
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
       {status && (
-        <div className={`mb-6 rounded-lg border px-4 py-3 text-sm ${status.mode === "demo" ? "border-gold/60 bg-gold/10 text-ink/80" : status.backendOk ? "border-forest-600/40 bg-forest-700/5 text-forest-800" : "border-red-300 bg-red-50 text-red-800"}`}>
+        <div className={`mb-6 rounded-lg border px-4 py-3 text-sm ${status.mode === "demo" ? "border-gold/60 bg-gold/10 text-ink/80" : status.backendOk ? (status.extractorReady === false ? "border-gold/60 bg-gold/10 text-ink/80" : "border-forest-600/40 bg-forest-700/5 text-forest-800") : "border-red-300 bg-red-50 text-red-800"}`}>
           {status.mode === "demo" && <><b>Mode demonstrasi.</b> Backend belum terhubung, sehingga hasil dibangkitkan dari nama berkas untuk mencoba alur antarmuka. Hasil ini bukan prediksi model.</>}
-          {status.mode === "live" && status.backendOk && <><b>Backend terhubung.</b> Analisis dijalankan oleh model inferensi.</>}
+          {status.mode === "live" && status.backendOk && status.extractorReady !== false && <><b>Backend terhubung.</b> Analisis dijalankan oleh model inferensi.</>}
+          {status.mode === "live" && status.backendOk && status.extractorReady === false && <><b>Backend terhubung, tetapi ekstraktor audio belum dipasang.</b> Model sudah dimuat, namun audio mentah belum dapat diubah menjadi representasi; analisis akan ditolak (503). Lihat README bagian ekstraktor.</>}
           {status.mode === "live" && !status.backendOk && <><b>Backend tidak dapat dijangkau.</b> Periksa SIUL_API_URL dan pastikan server inferensi berjalan.</>}
         </div>
       )}
@@ -96,7 +99,8 @@ export default function AnalyzeClient() {
           {busy && <span className="text-sm text-ink/60">{mode === "batch" ? "Ekstraksi embedding dan clustering dapat memakan waktu beberapa menit." : "Mengekstrak embedding dari klip…"}</span>}</div>
       </div>
 
-      {single && <>{single.mode === "demo" && demo && <p className="mt-6 text-sm font-semibold text-ink/60">Hasil demonstrasi, bukan prediksi model.</p>}<SingleResultView r={single.result} audioUrl={audioUrl} /></>}
+      {(single ?? batch)?.warnings?.map(w => <p key={w} className="mt-6 rounded-lg border border-gold/60 bg-gold/10 px-4 py-3 text-sm">{w}</p>)}
+      {single && <>{single.mode === "demo" && <p className="mt-6 text-sm font-semibold text-ink/60">Hasil demonstrasi, bukan prediksi model.</p>}<SingleResultView r={single.result} audioUrl={audioUrl} /></>}
       {batch && <>{batch.mode === "demo" && <p className="mt-6 text-sm font-semibold text-ink/60">Hasil demonstrasi, bukan prediksi model.</p>}<BatchResultView data={batch} /></>}
     </div>
   );

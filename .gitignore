@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (.env.example sengaja ikut di-commit)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# model & lingkungan Python
+*.pkl
+backend/.venv
+__pycache__/
+.pytest_cache/
+
+# bobot model hasil unduhan (besar)
+backend/models/perch_v2/
+backend/models/birdnet/

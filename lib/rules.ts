@@ -24,16 +24,19 @@ export interface Decision { label: Label; rule: number; reason: string }
 
 export const DEFAULT_EVIDENCE: Evidence = { fK: 0, fC: 0, fB: 0, mB: 0.3, mC: 0.1, mK: 0.1, cB: 0.4, pB: 0.4, pK: 0.1, medNonTarget: 3, e: 0 };
 export const THRESHOLDS = { kutilang: { kaur: 5, ksib: -1.5 }, cendrawasih: { cpar: 4 }, bondol: { blon: 6 } };
+/** Ambang detektor "kuat" (ZS_STRONG di model). Cendrawasih tidak ikut membalik label klip (c_clip_flip = false). */
+export const STRONG = { kutilang: { kaur: 6.5, ksib: 0 }, bondol: { blon: 7.5 } };
 
 const p2 = (v: number) => v.toFixed(2).replace(".", ",");
 
 /** Aturan keputusan per cluster, berurutan; tanpa bukti positif hasilnya Unknown. */
 export function decide(ev: Evidence): Decision {
+  // Urutan Bondol, Cendrawasih, Kutilang sama dengan backend: saat seri, yang pertama menang.
   const top = [
-    { l: "Kutilang" as Label, v: ev.fK, n: "fK" },
-    { l: "Cendrawasih" as Label, v: ev.fC, n: "fC" },
     { l: "Bondol Jawa" as Label, v: ev.fB, n: "fB" },
-  ].sort((a, b) => b.v - a.v)[0];
+    { l: "Cendrawasih" as Label, v: ev.fC, n: "fC" },
+    { l: "Kutilang" as Label, v: ev.fK, n: "fK" },
+  ].reduce((best, c) => (c.v > best.v ? c : best));
   if (top.v >= 0.5) return { label: top.l, rule: 1, reason: `Mayoritas klip terdeteksi zero-shot (${top.n} = ${p2(top.v)}, ambang 0,50).` };
   if (ev.pK >= 0.6 && ev.mK >= Math.max(ev.mB, ev.mC, 0.25))
     return { label: "Kutilang", rule: 2, reason: `Probabilitas Kutilang ${p2(ev.pK)} (≥ 0,60) dan kemiripan tertinggi ke group Kutilang.` };
@@ -54,11 +57,18 @@ export function detectors(c: ClipEvidence) {
   };
 }
 
-/** Evaluasi mandiri satu klip: detektor zero-shot menjadi "fraksi" 0/1, sisanya memakai aturan yang sama. */
+/** Evaluasi mandiri satu klip: detektor zero-shot menjadi "fraksi" 0/1, sisanya memakai aturan yang sama, lalu strong flip seperti backend. */
 export function decideClip(c: ClipEvidence): Decision {
   const d = detectors(c);
-  const r = decide({ fK: d.kutilang ? 1 : 0, fC: d.cendrawasih ? 1 : 0, fB: d.bondol ? 1 : 0, mB: c.mB, mC: c.mC, mK: c.mK, cB: c.cB, pB: c.pB, pK: c.pK, medNonTarget: c.medNonTarget, e: c.e });
-  if (r.rule === 1) return { ...r, reason: `Detektor zero-shot ${r.label} terpicu pada klip ini.` };
+  let r = decide({ fK: d.kutilang ? 1 : 0, fC: d.cendrawasih ? 1 : 0, fB: d.bondol ? 1 : 0, mB: c.mB, mC: c.mC, mK: c.mK, cB: c.cB, pB: c.pB, pK: c.pK, medNonTarget: c.medNonTarget, e: c.e });
+  if (r.rule === 1) r = { ...r, reason: `Detektor zero-shot ${r.label} terpicu pada klip ini.` };
+  const strongB = c.blon >= STRONG.bondol.blon;
+  const strongK = c.kaur >= STRONG.kutilang.kaur && c.ksib >= STRONG.kutilang.ksib;
+  if (strongB !== strongK) { // tepat satu detektor kuat
+    const target: Label = strongK ? "Kutilang" : "Bondol Jawa";
+    if (strongK ? r.label !== "Kutilang" : r.label === "Unknown")
+      return { label: target, rule: 1, reason: `Detektor zero-shot kuat ${target} terpicu pada klip ini.` };
+  }
   return r;
 }
 
